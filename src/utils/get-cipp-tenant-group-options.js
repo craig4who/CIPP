@@ -1,5 +1,4 @@
-import M365LicensesDefault from "../data/M365Licenses.json";
-import M365LicensesAdditional from "../data/M365Licenses-additional.json";
+import { getM365Licenses } from "./m365-licenses-data";
 
 /**
  * Get all available licenses for tenant group dynamic rules
@@ -7,7 +6,7 @@ import M365LicensesAdditional from "../data/M365Licenses-additional.json";
  */
 export const getTenantGroupLicenseOptions = () => {
   // Combine both license files
-  const allLicenses = [...M365LicensesDefault, ...M365LicensesAdditional];
+  const allLicenses = getM365Licenses();
 
   // Create unique licenses map using String_Id as key for better deduplication
   const uniqueLicensesMap = new Map();
@@ -48,7 +47,7 @@ export const getTenantGroupLicenseOptions = () => {
  */
 export const getTenantGroupServicePlanOptions = () => {
   // Combine both license files
-  const allLicenses = [...M365LicensesDefault, ...M365LicensesAdditional];
+  const allLicenses = getM365Licenses();
 
   // Create unique service plans map using Service_Plan_Name as key for better deduplication
   const uniqueServicePlansMap = new Map();
@@ -125,6 +124,16 @@ export const getTenantGroupPropertyOptions = () => {
       value: "delegatedAccessStatus",
       type: "delegatedAccess",
     },
+    {
+      label: "Member of Tenant Group",
+      value: "tenantGroupMember",
+      type: "tenantGroup",
+    },
+    {
+      label: "Custom Variable",
+      value: "customVariable",
+      type: "customVariable",
+    },
   ];
 };
 
@@ -141,7 +150,7 @@ export const getTenantGroupOperatorOptions = (propertyType) => {
     {
       label: "Not Equals",
       value: "ne",
-    }
+    },
   ];
 
   const arrayOperators = [
@@ -152,12 +161,33 @@ export const getTenantGroupOperatorOptions = (propertyType) => {
     {
       label: "Not In",
       value: "notIn",
-    }
+    },
   ];
+
+  const textOperators = [
+    {
+      label: "Contains",
+      value: "like",
+    },
+    {
+      label: "Does Not Contain",
+      value: "notlike",
+    },
+  ];
+
+  // Custom Variable supports text comparison
+  if (propertyType === "customVariable") {
+    return [...baseOperators, ...textOperators];
+  }
 
   // Delegated Access Status only supports equals/not equals
   if (propertyType === "delegatedAccess") {
     return baseOperators;
+  }
+
+  // Tenant group only supports in/notin
+  if (propertyType === "tenantGroup") {
+    return arrayOperators;
   }
 
   // License and Service Plan support all operators
@@ -166,7 +196,7 @@ export const getTenantGroupOperatorOptions = (propertyType) => {
 
 /**
  * Get value options based on the selected property type
- * @param {string} propertyType - The type of property (license, servicePlan, delegatedAccess)
+ * @param {string} propertyType - The type of property (license, servicePlan, delegatedAccess, tenantGroup)
  * @returns {Array} Array of value options for the selected property type
  */
 export const getTenantGroupValueOptions = (propertyType) => {
@@ -177,7 +207,25 @@ export const getTenantGroupValueOptions = (propertyType) => {
       return getTenantGroupServicePlanOptions();
     case "delegatedAccess":
       return getTenantGroupDelegatedAccessOptions();
+    case "tenantGroup":
+      // Return empty array - will be populated dynamically via API
+      return [];
+    case "customVariable":
+      // Return empty array - uses free-text input with variable name
+      return [];
     default:
       return [];
   }
 };
+
+/**
+ * Get tenant group options query configuration for use with ApiGetCallWithPagination
+ * This should be used with ApiGetCallWithPagination hook in components
+ * Uses the same query key as the Tenant Group table list for cache consistency
+ * @returns {Object} Query configuration object for ApiGetCallWithPagination
+ */
+export const getTenantGroupsQuery = () => ({
+  url: "/api/ListTenantGroups",
+  queryKey: "TenantGroupListPage",
+  waiting: true,
+});
